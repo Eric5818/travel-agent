@@ -7,6 +7,7 @@ from typing import Iterator
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from app.agent.chat_agent import AgentTurn, ChatAgent
@@ -158,6 +159,9 @@ def create_app(
         )
 
     if STATIC_DIR.exists():
+        app.mount(
+            "/static", StaticFiles(directory=STATIC_DIR), name="static"
+        )
 
         @app.get("/")
         async def index():

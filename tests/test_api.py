@@ -127,3 +127,23 @@ def test_health_reports_dependencies():
     assert data["tavily"] == "ok"
     assert data["weather"] == "ok"
     assert data["degraded"] is False
+
+
+def test_root_serves_chat_page():
+    app = create_app(agent=FakeAgent(), settings=None)
+    client = TestClient(app)
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/html")
+    assert "旅游推荐助手" in response.text
+    assert 'id="chat"' in response.text
+
+
+def test_static_assets_are_served():
+    app = create_app(agent=FakeAgent(), settings=None)
+    client = TestClient(app)
+
+    assert client.get("/static/app.js").status_code == 200
+    assert client.get("/static/style.css").status_code == 200

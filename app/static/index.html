@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>智能旅游推荐助手</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="app">
+    <header class="app-header">
+      <div>
+        <h1>智能旅游推荐助手</h1>
+        <p class="subtitle">告诉我目的地、天数和偏好，生成带天气与预算的每日行程</p>
+      </div>
+      <button id="new-session" class="ghost-button" type="button">新会话</button>
+    </header>
+
+    <section id="slots" class="slots" aria-label="行程槽位">
+      <span class="chip" data-slot="destination">目的地：待填写</span>
+      <span class="chip" data-slot="days">天数：待填写</span>
+      <span class="chip" data-slot="preferences">偏好：待填写</span>
+      <span class="chip filled" data-slot="budget_level">预算：舒适</span>
+      <span class="chip filled" data-slot="travelers">人数：1 人</span>
+      <span class="chip filled" data-slot="accommodation">住宿：酒店</span>
+    </section>
+
+    <main id="chat" class="chat" aria-live="polite"></main>
+
+    <section id="itinerary" class="itinerary hidden" aria-live="polite"></section>
+
+    <form id="composer" class="composer">
+      <label class="sr-only" for="message">输入消息</label>
+      <textarea id="message" rows="1" placeholder="例如：北京三天，喜欢历史"></textarea>
+      <button id="send" type="submit">发送</button>
+    </form>
+  </div>
+  <script src="/static/app.js"></script>
+</body>
+</html>
