@@ -123,7 +123,8 @@ class Itinerary(BaseModel):
 
 1. `search_attractions`
 2. `get_ticket_prices`（无候选景点则跳过，不计工具调用）
-3. `get_weather`
+3. `get_accommodation_options`（真实住宿参考价，详见 `2026-11-07-accommodation-prices-design.md`；`不需要` 则跳过）
+4. `get_weather`
 4. 生成行程（预算先用门票 0 的占位值，保证 schema 可校验）
 5. **回填票价**：遍历行程活动，按景点名精确匹配 `TicketInfo`
    - 已知/免费：覆盖 `cost_estimate` 与票价字段
@@ -146,10 +147,12 @@ def estimate_budget(
     ticket_total: float = 0,
     city_tier: int = 1,
     ticket_range: CostRange | None = None,
+    lodging_range: CostRange | None = None,
 ) -> BudgetBreakdown:
 ```
 
 - `ticket_range` 优先；未传时保持旧的 `ticket_total` 标量行为
+- `lodging_range` 为真实住宿总区间（晚数 × 房间数已在控制器中乘好）；未传时保持旧固定单价表行为
 - 门票区间已经是「总价」（控制器已乘人数）
 - 免费景点贡献 0；未知景点不贡献，只计入未知数量
 
