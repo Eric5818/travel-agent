@@ -3,8 +3,16 @@ import json
 from fastapi.testclient import TestClient
 
 from app.agent.chat_agent import ChatAgent
+from app.agent.tools.lodging import LodgingResult
+from app.agent.tools.tickets import TicketInfo
 from app.main import create_app
-from app.schemas import Attraction, BudgetBreakdown, CostRange, WeatherInfo
+from app.schemas import (
+    Attraction,
+    BudgetBreakdown,
+    CostRange,
+    HotelOption,
+    WeatherInfo,
+)
 
 
 class FakeLLM:
@@ -71,6 +79,35 @@ class FakeTools:
             )
         ]
 
+    async def tickets(self, city, attractions):
+        self.calls.append("tickets")
+        return [
+            TicketInfo(
+                attraction="故宫",
+                status="known",
+                price=CostRange(min=60, max=60),
+                note="门票 60 元",
+                source_url="https://ticket.example.com",
+            )
+        ]
+
+    async def lodging(
+        self, city, accommodation, budget_level, start_date, nights, travelers
+    ):
+        self.calls.append("lodging")
+        return LodgingResult(
+            status="known",
+            hotels=[
+                HotelOption(
+                    name="测试酒店",
+                    price_per_night=CostRange(min=400, max=600),
+                    source_url="https://hotel.example.com",
+                )
+            ],
+            nightly_range=CostRange(min=400, max=600),
+            note="参考价，查询于 2026-11-07",
+        )
+
     async def weather(self, city, start_date, days):
         self.calls.append("weather")
         return [
@@ -83,14 +120,28 @@ class FakeTools:
             )
         ]
 
-    def budget(self, days, travelers, budget_level, ticket_total=0, city_tier=1):
+    def budget(
+        self,
+        days,
+        travelers,
+        budget_level,
+        ticket_total=0,
+        city_tier=1,
+        ticket_range=None,
+        lodging_range=None,
+    ):
         self.calls.append("budget")
+        lodging = lodging_range or CostRange(min=800, max=1200)
+        tickets = ticket_range or CostRange(min=60, max=60)
         return BudgetBreakdown(
-            lodging=CostRange(min=800, max=1400),
+            lodging=lodging,
             food=CostRange(min=450, max=900),
             local_transport=CostRange(min=90, max=180),
-            tickets=CostRange(min=60, max=60),
-            total=CostRange(min=1400, max=2540),
+            tickets=tickets,
+            total=CostRange(
+                min=lodging.min + 450 + 90 + tickets.min,
+                max=lodging.max + 900 + 180 + tickets.max,
+            ),
         )
 
 
@@ -122,6 +173,8 @@ def test_full_conversation_collecting_to_completed():
     agent = ChatAgent(
         llm=llm,
         search_attractions=tools.search,
+        get_ticket_prices=tools.tickets,
+        get_accommodation_options=tools.lodging,
         get_weather=tools.weather,
         estimate_budget=tools.budget,
     )
@@ -163,7 +216,19 @@ def test_full_conversation_collecting_to_completed():
     assert itinerary["days"] == 3
     assert len(itinerary["day_plans"]) == 3
     assert itinerary["data_sources"] == ["tavily", "wttr.in", "estimate"]
-    assert itinerary["budget"]["total"] == {"min": 1400, "max": 2540}
+    assert itinerary["budget"]["lodging"] == {"min": 800, "max": 1200}
+    assert itinerary["budget"]["tickets"] == {"min": 60, "max": 60}
+    assert itinerary["budget"]["total"] == {"min": 1400, "max": 2340}
+    assert itinerary["accommodation_status"] == "known"
+    assert itinerary["accommodation_options"][0]["name"] == "测试酒店"
+    assert itinerary["ticket_unknown_count"] == 0
+    assert itinerary["day_plans"][0]["activities"][0]["ticket_status"] == "known"
 
     assert app.state.session_store.get(session_id).state == "COMPLETED"
-    assert tools.calls == ["search", "weather", "budget"]
+    assert tools.calls == [
+        "search",
+        "tickets",
+        "lodging",
+        "weather",
+        "budget",
+    ]

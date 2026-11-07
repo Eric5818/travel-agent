@@ -5,8 +5,16 @@ import pytest
 
 from app.agent.chat_agent import ChatAgent
 from app.agent.profile import TripProfile
+from app.agent.tools.lodging import LodgingResult
+from app.agent.tools.tickets import TicketInfo
 from app.errors import ItineraryGenerationError, ToolError
-from app.schemas import BudgetBreakdown, CostRange, WeatherInfo
+from app.schemas import (
+    Attraction,
+    BudgetBreakdown,
+    CostRange,
+    HotelOption,
+    WeatherInfo,
+)
 
 
 def extraction(**overrides) -> str:
@@ -71,15 +79,51 @@ class FakeSession:
 
 
 class FakeTools:
-    def __init__(self, search_error=None):
-        self.calls = {"search": 0, "weather": 0, "budget": 0}
+    def __init__(
+        self,
+        search_error=None,
+        attractions=None,
+        ticket_infos=None,
+        lodging_result=None,
+    ):
+        self.calls = {
+            "search": 0,
+            "tickets": 0,
+            "lodging": 0,
+            "weather": 0,
+            "budget": 0,
+        }
         self.search_error = search_error
+        self.attractions = attractions or []
+        self.ticket_infos = ticket_infos or []
+        self.lodging_result = lodging_result or LodgingResult(
+            status="known",
+            hotels=[
+                HotelOption(
+                    name="测试酒店",
+                    price_per_night=CostRange(min=400, max=600),
+                    source_url="https://hotel.example.com",
+                )
+            ],
+            nightly_range=CostRange(min=400, max=600),
+            note="参考价",
+        )
 
     async def search(self, city, keywords, limit=8):
         self.calls["search"] += 1
         if self.search_error is not None:
             raise self.search_error
-        return []
+        return self.attractions
+
+    async def tickets(self, city, attractions):
+        self.calls["tickets"] += 1
+        return self.ticket_infos
+
+    async def lodging(
+        self, city, accommodation, budget_level, start_date, nights, travelers
+    ):
+        self.calls["lodging"] += 1
+        return self.lodging_result
 
     async def weather(self, city, start_date, days):
         self.calls["weather"] += 1
@@ -93,14 +137,30 @@ class FakeTools:
             )
         ]
 
-    def budget(self, days, travelers, budget_level, ticket_total=0, city_tier=1):
+    def budget(
+        self,
+        days,
+        travelers,
+        budget_level,
+        ticket_total=0,
+        city_tier=1,
+        ticket_range=None,
+        lodging_range=None,
+    ):
         self.calls["budget"] += 1
+        lodging = lodging_range or CostRange(min=0, max=0)
+        tickets = ticket_range or CostRange(
+            min=ticket_total, max=ticket_total
+        )
         return BudgetBreakdown(
-            lodging=CostRange(min=300, max=500),
-            food=CostRange(min=100, max=200),
-            local_transport=CostRange(min=20, max=50),
-            tickets=CostRange(min=60, max=60),
-            total=CostRange(min=480, max=810),
+            lodging=lodging,
+            food=CostRange(min=150, max=300),
+            local_transport=CostRange(min=30, max=60),
+            tickets=tickets,
+            total=CostRange(
+                min=lodging.min + 150 + 30 + tickets.min,
+                max=lodging.max + 300 + 60 + tickets.max,
+            ),
         )
 
 
@@ -109,6 +169,8 @@ def make_agent(llm, tools=None, **kwargs):
     return ChatAgent(
         llm=llm,
         search_attractions=tools.search,
+        get_ticket_prices=tools.tickets,
+        get_accommodation_options=tools.lodging,
         get_weather=tools.weather,
         estimate_budget=tools.budget,
         **kwargs,
@@ -166,7 +228,13 @@ async def test_confirmed_plan_calls_tools_and_returns_itinerary():
     assert turn.itinerary.days == 3
     assert turn.itinerary.travelers == 1
     assert turn.error is None
-    assert tools.calls == {"search": 1, "weather": 1, "budget": 1}
+    assert tools.calls == {
+        "search": 1,
+        "tickets": 0,
+        "lodging": 1,
+        "weather": 1,
+        "budget": 1,
+    }
     assert session.state == "COMPLETED"
 
 
@@ -259,3 +327,158 @@ async def test_tool_call_limit_aborts_planning():
     assert turn.itinerary is None
     assert turn.error == "tool_limit"
     assert "上限" in turn.reply
+
+
+def known_ticket() -> TicketInfo:
+    return TicketInfo(
+        attraction="故宫",
+        status="known",
+        price=CostRange(min=60, max=60),
+        note="门票 60 元（查询于 2026-11-07）",
+        source_url="https://ticket.example.com",
+    )
+
+
+def known_lodging() -> LodgingResult:
+    return LodgingResult(
+        status="known",
+        hotels=[
+            HotelOption(
+                name="测试酒店",
+                price_per_night=CostRange(min=400, max=600),
+                source_url="https://hotel.example.com",
+            )
+        ],
+        nightly_range=CostRange(min=400, max=600),
+        note="参考价，查询于 2026-11-07",
+    )
+
+
+@pytest.mark.asyncio
+async def test_ticket_prices_are_patched_and_budgeted():
+    llm = FakeLLM(
+        [
+            extraction(
+                destination="北京",
+                days=3,
+                preferences=["历史"],
+                travelers=2,
+                intent="plan",
+            ),
+            json.dumps(GOOD_ITINERARY, ensure_ascii=False),
+        ]
+    )
+    tools = FakeTools(
+        attractions=[Attraction(name="故宫", category="历史")],
+        ticket_infos=[known_ticket()],
+        lodging_result=known_lodging(),
+    )
+    agent, _ = make_agent(llm, tools=tools)
+    session = FakeSession()
+
+    turn = await agent.handle("开始规划", session)
+
+    itinerary = turn.itinerary
+    assert itinerary is not None
+    activity = itinerary.day_plans[0].activities[0]
+    assert activity.ticket_status == "known"
+    assert activity.cost_estimate == CostRange(min=60, max=60)
+    assert itinerary.ticket_unknown_count == 0
+    assert itinerary.budget.lodging == CostRange(min=800, max=1200)
+    assert itinerary.budget.tickets == CostRange(min=120, max=120)
+    assert itinerary.accommodation_status == "known"
+
+
+@pytest.mark.asyncio
+async def test_unknown_ticket_is_not_budgeted():
+    llm = FakeLLM(
+        [
+            extraction(
+                destination="北京",
+                days=3,
+                preferences=["历史"],
+                intent="plan",
+            ),
+            json.dumps(GOOD_ITINERARY, ensure_ascii=False),
+        ]
+    )
+    tools = FakeTools(
+        attractions=[Attraction(name="故宫", category="历史")],
+        ticket_infos=[
+            TicketInfo(
+                attraction="故宫",
+                status="unknown",
+                note="未查到可靠票价",
+            )
+        ],
+        lodging_result=known_lodging(),
+    )
+    agent, _ = make_agent(llm, tools=tools)
+    session = FakeSession()
+
+    turn = await agent.handle("开始规划", session)
+
+    itinerary = turn.itinerary
+    assert itinerary.day_plans[0].activities[0].ticket_status == "unknown"
+    assert itinerary.day_plans[0].activities[0].cost_estimate is None
+    assert itinerary.ticket_unknown_count == 1
+    assert itinerary.budget.tickets == CostRange(min=0, max=0)
+
+
+@pytest.mark.asyncio
+async def test_unknown_lodging_does_not_fall_back_to_rate_table():
+    llm = FakeLLM(
+        [
+            extraction(
+                destination="北京",
+                days=3,
+                preferences=["历史"],
+                intent="plan",
+            ),
+            json.dumps(GOOD_ITINERARY, ensure_ascii=False),
+        ]
+    )
+    tools = FakeTools(
+        attractions=[Attraction(name="故宫", category="历史")],
+        ticket_infos=[known_ticket()],
+        lodging_result=LodgingResult(
+            status="unknown", note="未查到可靠酒店参考价"
+        ),
+    )
+    agent, _ = make_agent(llm, tools=tools)
+    session = FakeSession()
+
+    turn = await agent.handle("开始规划", session)
+
+    itinerary = turn.itinerary
+    assert itinerary.accommodation_status == "unknown"
+    assert itinerary.budget.lodging == CostRange(min=0, max=0)
+
+
+@pytest.mark.asyncio
+async def test_not_needed_accommodation_skips_lodging_query():
+    llm = FakeLLM(
+        [
+            extraction(
+                destination="北京",
+                days=3,
+                preferences=["历史"],
+                accommodation="不需要",
+                intent="plan",
+            ),
+            json.dumps(GOOD_ITINERARY, ensure_ascii=False),
+        ]
+    )
+    tools = FakeTools(
+        attractions=[Attraction(name="故宫", category="历史")],
+        ticket_infos=[known_ticket()],
+    )
+    agent, _ = make_agent(llm, tools=tools)
+    session = FakeSession()
+
+    turn = await agent.handle("开始规划", session)
+
+    itinerary = turn.itinerary
+    assert tools.calls["lodging"] == 0
+    assert itinerary.accommodation_status == "not_needed"
+    assert itinerary.budget.lodging == CostRange(min=0, max=0)
