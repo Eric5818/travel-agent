@@ -19,6 +19,14 @@ class CostRange(BaseModel):
         return self
 
 
+class Attraction(BaseModel):
+    name: str
+    category: str = ""
+    description: str = ""
+    address: str | None = None
+    source_url: str = ""
+
+
 class WeatherInfo(BaseModel):
     date: str
     weather_desc: str
