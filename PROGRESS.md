@@ -4,8 +4,8 @@
 - **项目路径**：`C:\Users\ASUS\Desktop\travel-agent`
 - **远程仓库**：https://github.com/Eric5818/travel-agent （public）
 - **当前分支**：`main`，与 `origin/main` 同步
-- **当前阶段**：设计与计划完成，环境与发布链路就绪，尚未开始编码
-- **总体进度**：约 30%
+- **当前阶段**：第一期功能全部完成，测试全绿，真实 API 冒烟通过
+- **总体进度**：约 100%
 
 ---
 
@@ -31,138 +31,134 @@
 
 ### 1. 需求与设计（100%）
 
-- [x] 明确产品形态、数据源、LLM、能力范围
-- [x] 确定状态机：`COLLECTING → PLANNING → COMPLETED`
-- [x] 定义 7 个槽位及必填/默认规则
-- [x] 定义 3 个工具契约（景点 / 天气 / 预算）
-- [x] 定义行程数据结构、API、SSE 事件
-- [x] 定义错误处理、测试策略、项目结构
+- 状态机：`COLLECTING → PLANNING → COMPLETED`
+- 7 个槽位及必填/默认规则
+- 3 个工具契约（景点 / 天气 / 预算）
+- 行程数据结构、API、SSE 事件、错误处理、测试策略
 
-设计文档：
-
-```
-docs/superpowers/specs/2026-11-07-travel-agent-design.md
-```
+设计文档：`docs/superpowers/specs/2026-11-07-travel-agent-design.md`
 
 ### 2. 实现计划（100%）
 
-- [x] 拆分为 11 个任务，含文件路径、测试用例、验收标准
+11 个任务，全部完成。计划文档：`docs/superpowers/plans/2026-11-07-travel-agent.md`
 
-计划文档：
+### 3. 实现任务（11 / 11）
 
+| # | 任务 | 状态 | 结果 |
+|---|---|---|---|
+| 1 | 项目骨架与配置 | ✅ | venv、requirements、Settings/load()、密钥不泄露 |
+| 2 | Pydantic 数据模型 | ✅ | CostRange/WeatherInfo/Activity/DayPlan/BudgetBreakdown/Itinerary |
+| 3 | 预算工具 | ✅ | 三档单价 + 城市系数，纯函数 |
+| 4 | 天气工具 | ✅ | wttr.in j1 解析，超出预报标记 unavailable |
+| 5 | 景点搜索工具 | ✅ | Tavily 映射，超时重试 1 次，类型化错误 |
+| 6 | TripProfile 槽位 | ✅ | 必填判定、默认值、日期换算天数 |
+| 7 | ChatAgent 与提示词 | ✅ | 抽取 → 追问/确认 → 工具 → 生成/修复 |
+| 8 | 会话存储 | ✅ | 内存 dict、40 条裁剪、每会话锁 |
+| 9 | FastAPI + SSE | ✅ | session/health/chat，事件顺序正确 |
+| 10 | 前端页面 | ✅ | 聊天、chips、行程卡片、预算表、375px 适配 |
+| 11 | 端到端 + README | ✅ | 集成测试、真实冒烟、文档 |
+
+### 4. 测试状态（49 passed，0 warning）
+
+```text
+tests/test_config.py        5 passed
+tests/test_schemas.py       3 passed
+tests/test_budget.py        8 passed
+tests/test_weather.py       3 passed
+tests/test_attractions.py   4 passed
+tests/test_profile.py       6 passed
+tests/test_chat_agent.py    7 passed
+tests/test_session.py       5 passed
+tests/test_api.py           7 passed
+tests/test_e2e.py           1 passed
+-----------------------------------
+合计                        49 passed
 ```
-docs/superpowers/plans/2026-11-07-travel-agent.md
+
+运行命令：
+
+```powershell
+.\.venv\Scripts\python -m pytest -v
 ```
 
-### 3. 本地运行环境（100%）
+### 5. 真实冒烟（2026-11-07）
 
-- [x] Python 3.10.11（用户级安装）
-  - `C:\Users\ASUS\AppData\Local\Programs\Python\Python310`
-- [x] 全局已安装 `openai 3.46.0`、`python-dotenv 1.2.4`
-- [x] pip 26.3
-- [x] `python` / `pip` 已加入用户 PATH
+- DeepSeek `deepseek-chat` + Tavily + wttr.in
+- 输入：`我想去北京玩三天，喜欢历史` → `好的，开始规划`
+- 结果：3 天行程卡片正常渲染；槽位 chips 为「北京 / 3 天 / 历史人文 / 舒适 / 1 人 / 酒店」；预算约 **¥1,340 – ¥2,480**；数据来源 Tavily / wttr.in / 本地估算；无错误事件
+- 前端另用真实浏览器验证了 375px 视口（`innerWidth=375`、`body.scrollWidth=375`，无横向溢出）
 
-### 4. API 凭证（100%）
+### 6. 环境与发布链路（100%）
 
-- [x] DeepSeek Key 验证通过：`https://api.deepseek.com/v1`
-- [x] Tavily Key 验证通过：搜索「北京 景点」返回结果
-- [x] `.env` 已创建，包含 DeepSeek / Tavily 配置
-- [x] `.env.example` 已创建，只有占位符
-- [x] `.gitignore` 已排除 `.env`
-- [x] 已确认 `.env` 未被 git 跟踪，仓库历史中无密钥
-
-### 5. Git 与发布链路（100%）
-
-- [x] Git 2.56.0 已安装（`C:\Program Files\Git`）
-- [x] git 身份：`Eric5818` / `3040222984@qq.com`
-- [x] GitHub CLI 2.103.3 已安装
-- [x] gh 已登录，Token 保存于系统 keyring
-- [x] Token 为 fine-grained，已确认权限：`Contents: Read and write`
-- [x] `gh auth setup-git` 已执行，CLI 可直接推送
-- [x] 已配置 GitHub 定向代理：`http://127.0.0.1:12450`
-- [x] 远程仓库为 **public**，默认分支 `main`
-- [x] 本地与远程已同步，工作区干净
-
-### 6. Git 提交历史
-
-```
-baa8af0  docs: 更新进度并记录远程仓库信息
-f1aa051  docs: 初始化旅游助手的设计文档与实现计划
-```
+- Python 3.10.11（用户级），项目内 `.venv`
+- `requirements.txt` 已冻结全部依赖版本
+- DeepSeek / Tavily Key 已验证并写入 `.env`（已忽略）
+- Git 2.56.0、GitHub CLI 2.103.3 已安装并登录
+- GitHub 定向代理：`http://127.0.0.1:12450`
+- 远程仓库 public，`main` 分支已同步
 
 ### 7. 当前文件清单
 
-```
+```text
 travel-agent/
-├── .env                  # 真实密钥，已被忽略，绝不提交
-├── .env.example          # 占位符模板
+├── app/
+│   ├── __init__.py
+│   ├── main.py
+│   ├── config.py
+│   ├── errors.py
+│   ├── schemas.py
+│   ├── session.py
+│   ├── agent/
+│   │   ├── __init__.py
+│   │   ├── chat_agent.py
+│   │   ├── profile.py
+│   │   ├── prompts.py
+│   │   └── tools/
+│   │       ├── __init__.py
+│   │       ├── attractions.py
+│   │       ├── budget.py
+│   │       └── weather.py
+│   └── static/
+│       ├── index.html
+│       ├── app.js
+│       └── style.css
+├── tests/
+│   ├── fixtures/weather_j1.json
+│   ├── test_config.py
+│   ├── test_schemas.py
+│   ├── test_budget.py
+│   ├── test_weather.py
+│   ├── test_attractions.py
+│   ├── test_profile.py
+│   ├── test_chat_agent.py
+│   ├── test_session.py
+│   ├── test_api.py
+│   └── test_e2e.py
+├── docs/superpowers/specs/2026-11-07-travel-agent-design.md
+├── docs/superpowers/plans/2026-11-07-travel-agent.md
+├── .env                  # 真实密钥，已忽略，绝不提交
+├── .env.example
 ├── .gitignore
-├── PROGRESS.md           # 本文件
-└── docs/
-    └── superpowers/
-        ├── specs/2026-11-07-travel-agent-design.md    # 设计（9 KB）
-        └── plans/2026-11-07-travel-agent.md           # 计划（8 KB）
+├── pytest.ini
+├── requirements.txt
+├── README.md
+└── PROGRESS.md
 ```
 
 ---
 
-## 三、未完成 ❌
+## 三、实现中的决策与偏差
 
-### 实现任务（0 / 11）
-
-| # | 任务 | 状态 | 关键验收 |
-|---|---|---|---|
-| 1 | 项目骨架与配置 | ❌ 未开始 | 缺 Key 明确报错，不泄露密钥 |
-| 2 | Pydantic 数据模型 | ❌ 未开始 | 行程可往返序列化 |
-| 3 | 预算工具 | ❌ 未开始 | 纯函数、区间正确、人数逻辑对 |
-| 4 | 天气工具 | ❌ 未开始 | 超预报天数标记不可用，不编造 |
-| 5 | 景点搜索工具 | ❌ 未开始 | Tavily 映射、超时重试、未配置报错 |
-| 6 | TripProfile 槽位 | ❌ 未开始 | 缺什么问什么，默认值正确 |
-| 7 | ChatAgent + 提示词 | ❌ 未开始 | 槽位不全不调工具；JSON 非法只修复一次 |
-| 8 | 会话存储 | ❌ 未开始 | 历史裁剪、并发锁 |
-| 9 | FastAPI + SSE | ❌ 未开始 | 事件顺序正确、依赖可注入 |
-| 10 | 前端页面 | ❌ 未开始 | 聊天 + 槽位 chips + 行程卡片 |
-| 11 | 端到端 + README | ❌ 未开始 | 全量测试通过 + 真实冒烟 |
-
-### 环境准备（尚未做）
-
-- [ ] 创建项目 venv：`python -m venv .venv`
-- [ ] 编写 `requirements.txt`
-- [ ] 安装项目依赖：
-  - `fastapi`
-  - `uvicorn[standard]`
-  - `openai`
-  - `python-dotenv`
-  - `requests`
-  - `tavily-python`
-  - `pydantic`
-  - `pytest`
-  - `pytest-asyncio`
-  - `httpx`
+1. **`Itinerary` 字段重名**：设计文档同时写了 `days: int` 与 `days: list[DayPlan]`。实现采用 `days: int` + `day_plans: list[DayPlan]`，与 `TripProfile.days` 保持一致。
+2. **天气不可用字段**：`WeatherInfo.temp_high_c / temp_low_c / chance_of_rain` 改为可选；超出预报范围时置 `None` 并标记 `unavailable=True`，避免用 0 冒充真实数据。
+3. **预算注入**：LLM 只生成行程结构，`city / days / travelers / start_date / budget` 由控制器用可信值覆盖，防止模型改写预算。
+4. **工具调用上限**：`ChatAgent.max_tool_calls` 默认 6，可注入更小值测试。
+5. **住宿晚数**：预算中住宿按 `days - 1` 晚计（单日行程按 1 晚），符合常见出行习惯。
+6. **天气描述语言**：wttr.in 原样返回英文描述，未做翻译。
 
 ---
 
-## 四、当前阻塞与待决事项
-
-**当前无阻塞。** 环境、凭证、Git、代理、推送链路均已验证。
-
-需要长期注意的三点：
-
-1. **代理必须运行**：直连 `github.com:443` 不稳定，git 已配置定向代理 `http://127.0.0.1:12450`。代理客户端关闭时，fetch/push 会超时。
-2. **Token 有效期**：当前 fine-grained Token 有到期时间。到期或撤销后，需重新生成并执行：
-   ```powershell
-   gh auth login --with-token
-   gh auth setup-git
-   ```
-   注意：PowerShell 管道可能给 Token 加换行，建议用 cmd 重定向：
-   ```cmd
-   gh auth login --with-token < token.txt
-   ```
-3. **仓库是公开的**：代码与设计文档对所有人可见。`.env` 已忽略，但提交前仍应检查。
-
----
-
-## 五、已知限制与风险
+## 四、已知限制与风险
 
 | 风险 | 影响 | 应对 |
 |---|---|---|
@@ -170,39 +166,37 @@ travel-agent/
 | 会话存内存 | 重启丢失 | 第一期接受；后续可换 SQLite |
 | Tavily 免费额度 | 高频使用可能耗尽 | 控制搜索次数，后续加缓存 |
 | LLM 生成 JSON 不稳定 | 行程解析失败 | 校验 + 只修复一次；失败明确报错，不伪造兜底 |
-| 模型自由调用工具不可控 | 可能提前搜索或死循环 | 工具由控制器按槽位触发，硬限制 6 次 |
+| 门票价格缺失 | 预算门票可能为 0 | 景点数据未返回票价时不估算，保持真实 |
+| 天气描述为英文 | 中文界面中出现英文 | 后续可加描述映射或本地化 |
 | 代理客户端关闭 | git 无法访问 GitHub | 保持 `127.0.0.1:12450` 运行 |
 | `.env` 含真实密钥 | 误提交会泄露 | 已 gitignore；每次提交前检查 |
 
 ---
 
-## 六、下一步（按顺序）
+## 五、下一步（可选增强）
 
-1. **Task 1**：创建 `.venv`、`requirements.txt`、`app/config.py` 及其测试
-2. **Task 2-6**：数据模型、预算、天气、景点、槽位
-3. **Task 7**：ChatAgent 与提示词（核心）
-4. **Task 8-9**：会话存储、FastAPI + SSE
-5. **Task 10**：前端页面
-6. **Task 11**：端到端测试、真实冒烟、README
-7. 每完成一个任务：跑测试 → 提交 → 推送
-8. 全部完成后更新本文件
+1. 会话持久化（SQLite）与历史行程
+2. 天气描述中文化、门票价格补全
+3. Tavily 结果缓存与额度保护
+4. 餐饮推荐、真实 POI / 地图
+5. 导出 PDF / 分享链接
+6. 多城市联程与交通衔接
 
 ---
 
-## 七、恢复工作的方法
+## 六、恢复工作的方法
 
 新会话中按以下顺序阅读：
 
 1. 本文件 `PROGRESS.md`
-2. 设计文档 `docs/superpowers/specs/2026-11-07-travel-agent-design.md`
-3. 实现计划 `docs/superpowers/plans/2026-11-07-travel-agent.md`
-4. 从计划的 **Task 1** 开始执行
+2. `README.md`（安装、启动、API）
+3. 设计文档与实现计划（`docs/superpowers/`）
 
 ### 环境自检
 
 ```powershell
-python --version
-python -c "import openai, dotenv; print('deps ok')"
+.\.venv\Scripts\python --version
+.\.venv\Scripts\python -c "import fastapi, openai, tavily, pydantic; print('deps ok')"
 git --version
 gh auth status
 ```
@@ -211,19 +205,14 @@ gh auth status
 
 ```powershell
 git -C "C:\Users\ASUS\Desktop\travel-agent" status -sb
-git -C "C:\Users\ASUS\Desktop\travel-agent" log --oneline -3
+git -C "C:\Users\ASUS\Desktop\travel-agent" log --oneline -5
 ```
 
-### 密钥自检（不打印密钥）
+### 启动与验证
 
 ```powershell
-# Tavily
-python -c "import os; from dotenv import load_dotenv; load_dotenv(r'C:\Users\ASUS\Desktop\travel-agent\.env'); import urllib.request, json; k=os.environ['TAVILY_API_KEY']; req=urllib.request.Request('https://api.tavily.com/search', data=json.dumps({'api_key':k,'query':'test','max_results':1}).encode(), headers={'Content-Type':'application/json'}); print('tavily', urllib.request.urlopen(req, timeout=30).status)"
-```
-
-```powershell
-# DeepSeek
-python -c "import os; from dotenv import load_dotenv; load_dotenv(r'C:\Users\ASUS\Desktop\travel-agent\.env'); from openai import OpenAI; c=OpenAI(api_key=os.environ['DEEPSEEK_API_KEY'], base_url=os.environ['DEEPSEEK_BASE_URL']); r=c.chat.completions.create(model=os.environ['DEEPSEEK_MODEL'], messages=[{'role':'user','content':'hi'}], max_tokens=5); print('deepseek ok')"
+.\.venv\Scripts\python -m uvicorn app.main:app --reload
+.\.venv\Scripts\python -m pytest -v
 ```
 
 ### 提交与推送
