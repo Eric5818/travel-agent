@@ -19,6 +19,17 @@ class CostRange(BaseModel):
         return self
 
 
+TicketStatus = Literal["known", "free", "unknown"]
+AccommodationStatus = Literal["known", "unknown", "not_needed"]
+
+
+class HotelOption(BaseModel):
+    name: str
+    price_per_night: CostRange | None = None
+    note: str = ""
+    source_url: str | None = None
+
+
 class Attraction(BaseModel):
     name: str
     category: str = ""
@@ -46,6 +57,9 @@ class Activity(BaseModel):
     location_hint: str | None = None
     cost_estimate: CostRange | None = None
     source_url: str | None = None
+    ticket_status: TicketStatus | None = None
+    ticket_note: str | None = None
+    ticket_source_url: str | None = None
 
 
 class DayPlan(BaseModel):
@@ -76,3 +90,7 @@ class Itinerary(BaseModel):
     budget: BudgetBreakdown
     tips: list[str] = Field(default_factory=list)
     data_sources: list[DataSource] = Field(default_factory=list)
+    accommodation_options: list[HotelOption] = Field(default_factory=list)
+    accommodation_status: AccommodationStatus = "unknown"
+    accommodation_note: str | None = None
+    ticket_unknown_count: int = 0

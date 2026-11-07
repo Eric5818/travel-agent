@@ -81,3 +81,49 @@ def test_itinerary_round_trips():
 def test_data_sources_rejects_unknown_source():
     with pytest.raises(ValidationError):
         make_itinerary(data_sources=["tavily", "google"])
+
+
+def test_activity_ticket_fields_default_to_none():
+    activity = Activity(
+        time="09:00",
+        name="故宫",
+        type="attraction",
+        duration_min=60,
+        description="参观",
+    )
+
+    assert activity.ticket_status is None
+    assert activity.ticket_note is None
+    assert activity.ticket_source_url is None
+
+
+def test_itinerary_accommodation_and_ticket_defaults():
+    itinerary = make_itinerary()
+
+    assert itinerary.accommodation_options == []
+    assert itinerary.accommodation_status == "unknown"
+    assert itinerary.accommodation_note is None
+    assert itinerary.ticket_unknown_count == 0
+
+
+def test_itinerary_with_ticket_and_hotel_round_trips():
+    from app.schemas import HotelOption
+
+    itinerary = make_itinerary()
+    itinerary.ticket_unknown_count = 2
+    itinerary.accommodation_status = "known"
+    itinerary.accommodation_note = "参考价"
+    itinerary.accommodation_options = [
+        HotelOption(
+            name="测试酒店",
+            price_per_night=CostRange(min=400, max=600),
+            note="含早",
+            source_url="https://example.com/hotel",
+        )
+    ]
+    itinerary.day_plans[0].activities[0].ticket_status = "known"
+    itinerary.day_plans[0].activities[0].ticket_note = "查询于 2026-11-07"
+
+    restored = Itinerary.model_validate(itinerary.model_dump(mode="json"))
+
+    assert restored == itinerary
