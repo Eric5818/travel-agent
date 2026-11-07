@@ -22,9 +22,9 @@ class CostRange(BaseModel):
 class WeatherInfo(BaseModel):
     date: str
     weather_desc: str
-    temp_high_c: float
-    temp_low_c: float
-    chance_of_rain: int = Field(ge=0, le=100)
+    temp_high_c: float | None = None
+    temp_low_c: float | None = None
+    chance_of_rain: int | None = Field(default=None, ge=0, le=100)
     suggestion: str = ""
     unavailable: bool = False
 

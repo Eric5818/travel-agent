@@ -1,0 +1,64 @@
+{
+  "current_condition": [
+    {
+      "temp_C": "6",
+      "weatherDesc": [{"value": "晴"}]
+    }
+  ],
+  "nearest_area": [
+    {
+      "areaName": [{"value": "Beijing"}],
+      "country": [{"value": "China"}]
+    }
+  ],
+  "weather": [
+    {
+      "date": "2026-11-20",
+      "maxtempC": "10",
+      "mintempC": "2",
+      "avgtempC": "6",
+      "hourly": [
+        {"time": "0", "chanceofrain": "10", "weatherDesc": [{"value": "晴"}]},
+        {"time": "300", "chanceofrain": "10", "weatherDesc": [{"value": "晴"}]},
+        {"time": "600", "chanceofrain": "0", "weatherDesc": [{"value": "晴"}]},
+        {"time": "900", "chanceofrain": "0", "weatherDesc": [{"value": "多云"}]},
+        {"time": "1200", "chanceofrain": "0", "weatherDesc": [{"value": "晴"}]},
+        {"time": "1500", "chanceofrain": "10", "weatherDesc": [{"value": "晴"}]},
+        {"time": "1800", "chanceofrain": "10", "weatherDesc": [{"value": "多云"}]},
+        {"time": "2100", "chanceofrain": "20", "weatherDesc": [{"value": "多云"}]}
+      ]
+    },
+    {
+      "date": "2026-11-21",
+      "maxtempC": "12",
+      "mintempC": "4",
+      "avgtempC": "8",
+      "hourly": [
+        {"time": "0", "chanceofrain": "20", "weatherDesc": [{"value": "多云"}]},
+        {"time": "300", "chanceofrain": "20", "weatherDesc": [{"value": "多云"}]},
+        {"time": "600", "chanceofrain": "30", "weatherDesc": [{"value": "多云"}]},
+        {"time": "900", "chanceofrain": "40", "weatherDesc": [{"value": "阴"}]},
+        {"time": "1200", "chanceofrain": "60", "weatherDesc": [{"value": "小雨"}]},
+        {"time": "1500", "chanceofrain": "60", "weatherDesc": [{"value": "小雨"}]},
+        {"time": "1800", "chanceofrain": "50", "weatherDesc": [{"value": "阴"}]},
+        {"time": "2100", "chanceofrain": "30", "weatherDesc": [{"value": "多云"}]}
+      ]
+    },
+    {
+      "date": "2026-11-22",
+      "maxtempC": "8",
+      "mintempC": "-1",
+      "avgtempC": "3",
+      "hourly": [
+        {"time": "0", "chanceofrain": "0", "weatherDesc": [{"value": "晴"}]},
+        {"time": "300", "chanceofrain": "0", "weatherDesc": [{"value": "晴"}]},
+        {"time": "600", "chanceofrain": "0", "weatherDesc": [{"value": "晴"}]},
+        {"time": "900", "chanceofrain": "0", "weatherDesc": [{"value": "晴"}]},
+        {"time": "1200", "chanceofrain": "0", "weatherDesc": [{"value": "晴"}]},
+        {"time": "1500", "chanceofrain": "0", "weatherDesc": [{"value": "晴"}]},
+        {"time": "1800", "chanceofrain": "0", "weatherDesc": [{"value": "晴"}]},
+        {"time": "2100", "chanceofrain": "0", "weatherDesc": [{"value": "晴"}]}
+      ]
+    }
+  ]
+}
