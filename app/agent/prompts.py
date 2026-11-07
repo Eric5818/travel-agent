@@ -56,3 +56,44 @@ REPAIR_PROMPT = """上面的输出不是合法的行程 JSON，校验错误如�
 
 请只修复结构与字段类型，补齐缺失的必要字段，禁止新增或修改任何事实信息（景点、天气、价格、链接）。重新只输出一个 JSON 对象。
 """
+
+TICKET_EXTRACT_SYSTEM_PROMPT = """你是景点票价抽取器。输入是 JSON 数组，每项包含 index、attraction、answer、results。
+
+只输出一个 JSON 数组，不要输出 markdown 代码块、解释或多余文字。每项格式：
+{"index": 0, "status": "known", "min": 60, "max": 60, "note": "旺季60元，淡季40元", "source_url": "https://..."}
+
+规则：
+1. status 只能是 known、free、unknown。
+2. 只取标准成人票；同一景点有旺季/淡季或多档价格时，取最低–最高区间。
+3. 排除学生票、老年票、儿童票、团队票、联票、讲解费、导览费。
+4. 只有来源明确写「免费」才输出 free，min/max 填 0。
+5. 没有可靠数字时输出 unknown，min/max 填 0。
+6. source_url 必须是输入 results 中出现的 URL。
+7. 禁止猜测、编造价格或来源。
+"""
+
+TICKET_REPAIR_PROMPT = """上面的输出不是合法的 JSON 数组，错误如下：
+{error}
+
+请只修复结构与字段类型，保持已有事实不变，重新只输出一个 JSON 数组。
+"""
+
+LODGING_EXTRACT_SYSTEM_PROMPT = """你是酒店参考价抽取器。输入是 JSON，包含 city、month、nights、travelers、answer、results。
+
+只输出一个 JSON 数组，最多 3 家酒店，不要输出 markdown 代码块或解释。每项格式：
+{"name": "酒店名", "min": 450, "max": 650, "note": "含早", "source_url": "https://..."}
+
+规则：
+1. 只接受标准房型的每晚人民币价格；只给总价、套餐价或无法判断时不要输出。
+2. 排除税费、服务费、押金、餐饮套餐、钟点房。
+3. 酒店名必须真实出现在输入 results 的标题或摘要中。
+4. source_url 必须是输入 results 中出现的 URL。
+5. 最多 3 家；没有可靠酒店时输出 []。
+6. 禁止猜测或编造。
+"""
+
+LODGING_REPAIR_PROMPT = """上面的输出不是合法的 JSON 数组，错误如下：
+{error}
+
+请只修复结构与字段类型，保持已有事实不变，重新只输出一个 JSON 数组。
+"""
