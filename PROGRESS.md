@@ -76,6 +76,22 @@ travel-agent/
     └── superpowers/plans/2026-11-07-travel-agent.md
 ```
 
+### 4. Git 与远程仓库
+
+- [x] 安装 Git 2.56.0
+- [x] 配置 git 身份：`Eric5818` / `3040222984@qq.com`
+- [x] `git init -b main` 并完成首次提交 `f1aa051`
+- [x] 通过 GitHub Desktop 发布公开仓库
+- [x] 配置 `http.https://github.com.proxy = http://127.0.0.1:12450`
+- [x] 验证远程 `main` 与本地一致、仓库为 public
+- [x] 确认 `.env` 未被跟踪、已跟踪文件中无密钥
+
+远程地址：
+
+```
+https://github.com/Eric5818/travel-agent
+```
+
 ---
 
 ## 三、未完成 ❌
@@ -101,32 +117,26 @@ travel-agent/
 - [ ] 创建项目 venv（`.venv`）
 - [ ] 编写 `requirements.txt`
 - [ ] 安装项目依赖（fastapi、uvicorn、tavily-python、httpx、pytest 等）
-- [ ] 安装 Git
-- [ ] 配置 `user.name` / `user.email`
-- [ ] 初始化 git 仓库并首次提交
 
-### 发布到 Git（尚未做）
+### 发布到 Git（已完成）
 
-- [ ] 选择发布路线（Git + gh / Git + PAT）
-- [ ] 安装 GitHub CLI（若走路线 A）
-- [ ] 完成 GitHub 登录认证
-- [ ] 创建远程仓库（public 或 private）
-- [ ] 推送代码
-- [ ] 确认 `.env` 未被提交、仓库历史中无密钥
+- [x] 选择发布方式：Git + GitHub Desktop
+- [x] 安装 Git 并配置身份
+- [x] 初始化仓库并首次提交
+- [x] 创建公开远程仓库并推送
+- [x] 确认 `.env` 未被提交、仓库历史中无密钥
 
 ---
 
 ## 四、当前阻塞与待决事项
 
-1. **发布路线未定**
-   - 路线 A：安装 Git + GitHub CLI，`gh auth login` 后一键建仓推送（推荐）
-   - 路线 B：只装 Git，手动建仓 + HTTPS + Personal Access Token
-2. **Git 身份信息缺失**
-   - 需要确定 `user.name` 和 `user.email`
-3. **仓库可见性未定**
-   - 公开（便于展示）还是先私有
-4. **Git 安装权限**
-   - 当前 shell 非管理员；优先尝试用户级安装，失败则用 PortableGit
+**当前无阻塞。**
+
+补充说明：
+
+1. `gh` CLI 已安装但未登录。GitHub Desktop 已完成认证与发布，因此 gh 不是必需。若以后想用 `gh` 管理 Issue/PR，需在带代理的终端里重新 `gh auth login --web`。
+2. 直连 `github.com:443` 不稳定，已为 git 配置定向代理 `http://127.0.0.1:12450`。**代理客户端必须保持运行**，否则 fetch/push 会超时。
+3. 仓库当前为 **public**，代码与设计文档对所有人可见。
 
 ---
 
@@ -145,13 +155,11 @@ travel-agent/
 
 ## 六、下一步（按顺序）
 
-1. 确认发布路线与 Git 身份信息
-2. 安装 Git，初始化仓库
-3. 执行 Task 1：venv、依赖、`config.py` 及其测试
-4. 依次完成 Task 2-11（严格 TDD）
-5. 真实 API 冒烟测试
-6. 写 README，提交并推送
-7. 确认远程仓库无密钥后，设置为公开
+1. 执行 Task 1：创建 venv、`requirements.txt`、`config.py` 及其测试
+2. 依次完成 Task 2-11（严格 TDD）
+3. 真实 API 冒烟测试
+4. 写 README，提交并推送
+5. 本地与远程全量测试通过后，更新本文件的进度
 
 ---
 
