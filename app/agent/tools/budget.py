@@ -40,6 +40,8 @@ def estimate_budget(
     budget_level: str,
     ticket_total: float = 0,
     city_tier: int = 1,
+    ticket_range: CostRange | None = None,
+    lodging_range: CostRange | None = None,
 ) -> BudgetBreakdown:
     if days <= 0:
         raise ValueError("days 必须大于 0")
@@ -53,12 +55,21 @@ def estimate_budget(
     factor = CITY_TIER_FACTOR[city_tier]
     nights = days - 1 if days > 1 else 1
 
-    lodging = _range(LODGING_RATE[budget_level], nights * factor)
+    if lodging_range is not None:
+        lodging = lodging_range
+    else:
+        lodging = _range(LODGING_RATE[budget_level], nights * factor)
+
     food = _range(FOOD_RATE[budget_level], days * travelers * factor)
     local_transport = _range(
         LOCAL_TRANSPORT_RATE[budget_level], days * travelers * factor
     )
-    tickets = CostRange(min=round(ticket_total, 2), max=round(ticket_total, 2))
+    if ticket_range is not None:
+        tickets = ticket_range
+    else:
+        tickets = CostRange(
+            min=round(ticket_total, 2), max=round(ticket_total, 2)
+        )
 
     total = CostRange(
         min=round(

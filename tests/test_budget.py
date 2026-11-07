@@ -1,7 +1,7 @@
 import pytest
 
 from app.agent.tools.budget import estimate_budget
-from app.schemas import BudgetBreakdown
+from app.schemas import BudgetBreakdown, CostRange
 
 
 def test_budget_levels_increase_lodging():
@@ -64,3 +64,36 @@ def test_city_tier_2_is_cheaper_than_tier_1():
 
 def test_returns_budget_breakdown():
     assert isinstance(estimate_budget(3, 1, "舒适"), BudgetBreakdown)
+
+
+def test_lodging_range_overrides_rate_table():
+    result = estimate_budget(
+        3, 2, "舒适", lodging_range=CostRange(min=1000, max=2000)
+    )
+
+    assert result.lodging == CostRange(min=1000, max=2000)
+
+
+def test_ticket_range_is_used():
+    result = estimate_budget(
+        3, 2, "舒适", ticket_range=CostRange(min=100, max=200)
+    )
+
+    assert result.tickets == CostRange(min=100, max=200)
+
+
+def test_real_ranges_are_included_in_total():
+    result = estimate_budget(
+        3,
+        1,
+        "舒适",
+        ticket_range=CostRange(min=100, max=200),
+        lodging_range=CostRange(min=800, max=1200),
+    )
+
+    assert result.total.min == pytest.approx(
+        800 + result.food.min + result.local_transport.min + 100
+    )
+    assert result.total.max == pytest.approx(
+        1200 + result.food.max + result.local_transport.max + 200
+    )
