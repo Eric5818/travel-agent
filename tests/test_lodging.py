@@ -10,9 +10,11 @@ class FakeTavily:
         self.payload = payload
         self.exc = exc
         self.queries = []
+        self.kwargs = None
 
     def search(self, query, **kwargs):
         self.queries.append(query)
+        self.kwargs = kwargs
         if self.exc is not None:
             raise self.exc
         return self.payload
@@ -22,9 +24,11 @@ class FakeLLM:
     def __init__(self, responses):
         self.responses = list(responses)
         self.calls = 0
+        self.messages = []
 
     async def complete(self, messages):
         self.calls += 1
+        self.messages.append(messages)
         return self.responses.pop(0)
 
 
@@ -70,6 +74,13 @@ async def test_known_hotels_and_nightly_range():
     assert result.nightly_range.min == 450
     assert result.nightly_range.max == 600
     assert "非实时库存" in result.note
+    assert "每晚价格" in client.queries[0]
+    assert client.kwargs["country"] == "china"
+    assert client.kwargs["language"] == "zh"
+    context = json.loads(llm.messages[0][1]["content"])
+    assert context["city"] == "北京"
+    assert context["budget_level"] == "舒适"
+    assert context["nights"] == 2
 
 
 @pytest.mark.asyncio
@@ -113,6 +124,34 @@ async def test_hotel_with_unknown_name_is_discarded():
 
     result = await get_accommodation_options(
         "北京", "酒店", "舒适", None, 2, 2, llm, client=client
+    )
+
+    assert result.status == "unknown"
+
+
+@pytest.mark.asyncio
+async def test_foreign_currency_price_is_rejected_even_with_cny_elsewhere():
+    payload = {
+        "answer": "北京饭店 US$500，附近餐厅人均 5000 元",
+        "results": [
+            {
+                "title": "北京饭店",
+                "url": "https://a",
+                "content": "北京饭店 US$500，附近餐厅人均 5000 元",
+            }
+        ],
+    }
+    llm = FakeLLM(
+        [
+            json.dumps(
+                [{"name": "北京饭店", "min": 500, "max": 500, "note": "", "source_url": "https://a"}],
+                ensure_ascii=False,
+            )
+        ]
+    )
+
+    result = await get_accommodation_options(
+        "北京", "酒店", "舒适", None, 2, 2, llm, client=FakeTavily(payload)
     )
 
     assert result.status == "unknown"

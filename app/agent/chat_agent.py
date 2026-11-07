@@ -29,7 +29,7 @@ from app.agent.tools.tickets import (
 )
 from app.agent.tools.weather import get_weather as default_get_weather
 from app.errors import ItineraryGenerationError, ToolError
-from app.schemas import BudgetBreakdown, CostRange, Itinerary
+from app.schemas import Attraction, BudgetBreakdown, CostRange, Itinerary
 
 MAX_TOOL_CALLS = 6
 
@@ -174,11 +174,6 @@ class ChatAgent:
         self._consume_tool_call()
         attractions = await self.search_attractions(city, profile.preferences)
 
-        ticket_infos: list[TicketInfo] = []
-        if attractions:
-            self._consume_tool_call()
-            ticket_infos = await self.get_ticket_prices(city, attractions)
-
         if profile.accommodation == "不需要":
             lodging = LodgingResult(status="not_needed", note="不需要住宿")
         else:
@@ -215,6 +210,22 @@ class ChatAgent:
         itinerary = await self._generate_itinerary(
             profile, attractions, weather, placeholder_budget
         )
+
+        activity_names: list[str] = []
+        for day in itinerary.day_plans:
+            for activity in day.activities:
+                if activity.type != "attraction":
+                    continue
+                name = activity.name.strip()
+                if name and name not in activity_names:
+                    activity_names.append(name)
+
+        ticket_infos: list[TicketInfo] = []
+        if activity_names:
+            self._consume_tool_call()
+            ticket_infos = await self.get_ticket_prices(
+                city, [Attraction(name=name) for name in activity_names]
+            )
 
         unknown_count = self._apply_ticket_prices(itinerary, ticket_infos)
         ticket_range = self._ticket_range(

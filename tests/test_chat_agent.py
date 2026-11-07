@@ -96,6 +96,7 @@ class FakeTools:
         self.search_error = search_error
         self.attractions = attractions or []
         self.ticket_infos = ticket_infos or []
+        self.ticket_names: list[str] = []
         self.lodging_result = lodging_result or LodgingResult(
             status="known",
             hotels=[
@@ -117,6 +118,7 @@ class FakeTools:
 
     async def tickets(self, city, attractions):
         self.calls["tickets"] += 1
+        self.ticket_names = [item.name for item in attractions]
         return self.ticket_infos
 
     async def lodging(
@@ -230,7 +232,7 @@ async def test_confirmed_plan_calls_tools_and_returns_itinerary():
     assert turn.error is None
     assert tools.calls == {
         "search": 1,
-        "tickets": 0,
+        "tickets": 1,
         "lodging": 1,
         "weather": 1,
         "budget": 1,
@@ -369,7 +371,12 @@ async def test_ticket_prices_are_patched_and_budgeted():
         ]
     )
     tools = FakeTools(
-        attractions=[Attraction(name="故宫", category="历史")],
+        attractions=[
+            Attraction(
+                name="北京十大歷史人文景點｜故宮長城頤和園等經典文化地標攻略",
+                category="历史",
+            )
+        ],
         ticket_infos=[known_ticket()],
         lodging_result=known_lodging(),
     )
@@ -380,6 +387,7 @@ async def test_ticket_prices_are_patched_and_budgeted():
 
     itinerary = turn.itinerary
     assert itinerary is not None
+    assert tools.ticket_names == ["故宫"]
     activity = itinerary.day_plans[0].activities[0]
     assert activity.ticket_status == "known"
     assert activity.cost_estimate == CostRange(min=60, max=60)

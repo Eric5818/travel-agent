@@ -227,8 +227,8 @@ def test_full_conversation_collecting_to_completed():
     assert app.state.session_store.get(session_id).state == "COMPLETED"
     assert tools.calls == [
         "search",
-        "tickets",
         "lodging",
         "weather",
+        "tickets",
         "budget",
     ]

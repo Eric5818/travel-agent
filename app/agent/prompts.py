@@ -78,18 +78,20 @@ TICKET_REPAIR_PROMPT = """上面的输出不是合法的 JSON 数组，错误如
 请只修复结构与字段类型，保持已有事实不变，重新只输出一个 JSON 数组。
 """
 
-LODGING_EXTRACT_SYSTEM_PROMPT = """你是酒店参考价抽取器。输入是 JSON，包含 city、month、nights、travelers、answer、results。
+LODGING_EXTRACT_SYSTEM_PROMPT = """你是酒店参考价抽取器。输入是 JSON，包含 city、accommodation、budget_level、month、nights、travelers、answer、results。
 
 只输出一个 JSON 数组，最多 3 家酒店，不要输出 markdown 代码块或解释。每项格式：
 {"name": "酒店名", "min": 450, "max": 650, "note": "含早", "source_url": "https://..."}
 
 规则：
-1. 只接受标准房型的每晚人民币价格；只给总价、套餐价或无法判断时不要输出。
-2. 排除税费、服务费、押金、餐饮套餐、钟点房。
-3. 酒店名必须真实出现在输入 results 的标题或摘要中。
-4. source_url 必须是输入 results 中出现的 URL。
-5. 最多 3 家；没有可靠酒店时输出 []。
-6. 禁止猜测或编造。
+1. 只接受标准房型的每晚人民币价格，价格必须紧跟「元」「¥」「￥」「RMB」「CNY」或「yuan」；USD、HKD、TWD、SGD、UZS 等其他币种一律忽略。
+2. 只给总价、套餐价或无法判断时不要输出。
+3. 排除税费、服务费、押金、餐饮套餐、钟点房。
+4. 优先选择符合 budget_level 的酒店：经济约 300 元/晚以内，舒适约 300–800 元/晚，豪华约 800 元/晚以上；价格明显不属于该档次的不要输出。
+5. 酒店名必须真实出现在输入 results 的标题或摘要中。
+6. source_url 必须是输入 results 中出现的 URL。
+7. 最多 3 家；没有可靠酒店时输出 []。
+8. 禁止猜测或编造。
 """
 
 LODGING_REPAIR_PROMPT = """上面的输出不是合法的 JSON 数组，错误如下：

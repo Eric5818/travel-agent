@@ -119,25 +119,28 @@ class Itinerary(BaseModel):
 
 ## 8. 数据流
 
-`ChatAgent._plan` 顺序：
+`ChatAgent._plan` 顺序（已按真实冒烟修正）：
 
 1. `search_attractions`
-2. `get_ticket_prices`（无候选景点则跳过，不计工具调用）
-3. `get_accommodation_options`（真实住宿参考价，详见 `2026-11-07-accommodation-prices-design.md`；`不需要` 则跳过）
-4. `get_weather`
-4. 生成行程（预算先用门票 0 的占位值，保证 schema 可校验）
-5. **回填票价**：遍历行程活动，按景点名精确匹配 `TicketInfo`
+2. `get_accommodation_options`（真实住宿参考价，详见 `2026-11-07-accommodation-prices-design.md`；`不需要` 则跳过）
+3. `get_weather`
+4. 生成行程（预算先用全 0 占位值，保证 schema 可校验）
+5. **收集行程中的真实景点名**：遍历 `day_plans`，按名称去重
+6. `get_ticket_prices`：用第 5 步的景点名逐个查询（无景点则跳过，不计工具调用）
+7. **回填票价**：按景点名精确匹配 `TicketInfo`
    - 已知/免费：覆盖 `cost_estimate` 与票价字段
    - 未知或匹配不到：`ticket_status="unknown"`，`ticket_unknown_count += 1`
    - 非景点活动：不改动
-6. **预算重算**：
+8. **预算重算**：
    - 对行程中实际使用的景点去重
    - 单价区间求和 × `travelers` 得到门票总区间
-   - 调用 `estimate_budget(..., ticket_range=总区间)`
+   - 调用 `estimate_budget(..., ticket_range=总区间, lodging_range=住宿区间)`
    - 覆盖 `itinerary.budget`
-7. 返回 `AgentTurn`
+9. 返回 `AgentTurn`
 
-工具调用计数：景点搜索、票价查询、天气、预算各算 1 次；总上限仍为 6。
+> **实现修订（2026-11-07）**：真实冒烟发现 `search_attractions` 返回的是 Tavily 文章标题（如「北京十大歷史人文景點…」），不是单个景点，导致提前用文章标题查票价全部 unknown。改为先生成行程，再用行程中 LLM 提炼出的真实景点名（如「故宫博物院」）查询票价，名称与回填完全对齐。验证结果：5 个真实景点名全部返回可追溯票价。
+
+工具调用计数：景点搜索、住宿查询、天气、票价查询、预算各算 1 次；总上限仍为 6。
 
 ## 9. 预算接口
 
@@ -213,7 +216,8 @@ def estimate_budget(
 | 风险 | 影响 | 应对 |
 |---|---|---|
 | Tavily 摘要信息过时或不完整 | 票价不准确 | 显示查询日期与来源链接，注明以官方为准 |
-| 数字证据校验存在误匹配 | 少量错误价格可能通过 | 只接受本次景点来源内的数字；后续可加强邻近匹配 |
+| 景区搜索返回文章而非单个景点 | 票价查询名称错配 | 改为生成行程后使用活动中的真实景点名查询 |
+| 数字证据校验存在误匹配 | 少量错误价格可能通过 | 价格数字必须紧邻「元/¥/RMB/CNY」；支持区间写法 |
 | Tavily 额度消耗 | 每次规划最多 +8 次查询 | 并行执行；后续可加 24h 缓存 |
 | 境外景点票价币种不同 | 预算失真 | 当前仅支持人民币；来源非人民币或无法判断时标 unknown |
 | 景点名称与行程活动名称不完全一致 | 无法回填票价 | 精确匹配失败即标 unknown，不猜测 |

@@ -13,8 +13,7 @@ from app.agent.prompts import (
     LODGING_REPAIR_PROMPT,
 )
 from app.agent.tools.tavily_utils import (
-    contains_number,
-    is_cny_evidence,
+    contains_cny_price,
     search_with_retry,
     text_of,
     urls_of,
@@ -33,10 +32,10 @@ class LodgingResult(BaseModel):
     note: str = ""
 
 
-async def _extract(llm, payload: dict) -> list[dict]:
+async def _extract(llm, context: dict) -> list[dict]:
     base = [
         {"role": "system", "content": LODGING_EXTRACT_SYSTEM_PROMPT},
-        {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
+        {"role": "user", "content": json.dumps(context, ensure_ascii=False)},
     ]
     last_text = ""
     last_error = ""
@@ -75,9 +74,10 @@ def _validate_hotel(item: dict, payload: dict) -> HotelOption | None:
         return None
     if minimum < 0 or maximum < minimum:
         return None
-    if not (contains_number(text, minimum) and contains_number(text, maximum)):
-        return None
-    if not is_cny_evidence(text):
+    if not (
+        contains_cny_price(text, minimum)
+        and contains_cny_price(text, maximum)
+    ):
         return None
     if source_url not in urls:
         return None
@@ -105,10 +105,7 @@ async def get_accommodation_options(
         return LodgingResult(status="not_needed", note="不需要住宿")
 
     month = (start_date or date.today().isoformat())[:7]
-    query = (
-        f"{city} {accommodation} {budget_level} 住宿 价格 "
-        f"{month} {nights}晚 {travelers}人"
-    )
+    query = f"{city} {accommodation} 每晚价格 元 携程 美团"
 
     if client is None:
         key = (api_key or os.environ.get("TAVILY_API_KEY", "")).strip()
@@ -122,18 +119,34 @@ async def get_accommodation_options(
         client = TavilyClient(api_key=key)
 
     try:
-        payload = await search_with_retry(client, query, MAX_RESULTS)
+        payload = await search_with_retry(
+            client,
+            query,
+            MAX_RESULTS,
+            country="china",
+            language="zh",
+        )
     except ToolError:
         return LodgingResult(
             status="unknown", note="酒店查询失败，未查到参考价"
         )
 
-    items = await _extract(llm, payload)
+    context = {
+        "city": city,
+        "accommodation": accommodation,
+        "budget_level": budget_level,
+        "month": month,
+        "nights": nights,
+        "travelers": travelers,
+        "answer": payload.get("answer", ""),
+        "results": payload.get("results") or [],
+    }
+    items = await _extract(llm, context)
     hotels: list[HotelOption] = []
     for item in items:
         if not isinstance(item, dict):
             continue
-        hotel = _validate_hotel(item, payload)
+        hotel = _validate_hotel(item, context)
         if hotel is not None:
             hotels.append(hotel)
         if len(hotels) >= MAX_HOTELS:

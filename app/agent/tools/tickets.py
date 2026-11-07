@@ -11,8 +11,7 @@ from pydantic import BaseModel
 from app.agent.json_utils import parse_json_array
 from app.agent.prompts import TICKET_EXTRACT_SYSTEM_PROMPT, TICKET_REPAIR_PROMPT
 from app.agent.tools.tavily_utils import (
-    contains_number,
-    is_cny_evidence,
+    contains_cny_price,
     search_with_retry,
 )
 from app.errors import ToolError
@@ -150,10 +149,13 @@ def _validate_item(
 
     if minimum < 0 or maximum < minimum:
         return _unknown(bundle.attraction)
-    if not (contains_number(text, minimum) and contains_number(text, maximum)):
-        return _unknown(bundle.attraction, "票价证据不足，需官网确认")
-    if not is_cny_evidence(text):
-        return _unknown(bundle.attraction, "无法确认人民币票价，需官网确认")
+    if not (
+        contains_cny_price(text, minimum)
+        and contains_cny_price(text, maximum)
+    ):
+        return _unknown(
+            bundle.attraction, "票价证据不足或非人民币，需官网确认"
+        )
     if source_url not in urls:
         return _unknown(bundle.attraction, "票价来源不可追溯")
 

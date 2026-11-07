@@ -3,6 +3,7 @@ import asyncio
 import pytest
 
 from app.agent.tools.tavily_utils import (
+    contains_cny_price,
     contains_number,
     is_cny_evidence,
     search_with_retry,
@@ -72,3 +73,35 @@ def test_is_cny_evidence():
     assert is_cny_evidence("ticket 60 yuan") is True
     assert is_cny_evidence("ticket 60 USD") is False
     assert is_cny_evidence("60") is False
+
+
+def test_contains_cny_price_requires_adjacent_currency():
+    assert contains_cny_price("每晚 990 元", 990) is True
+    assert contains_cny_price("¥450/晚", 450) is True
+    assert contains_cny_price("450 yuan per night", 450) is True
+    assert contains_cny_price("US$124.77，另有 990 元", 124.77) is False
+    assert contains_cny_price("600 元", 60) is False
+    assert contains_cny_price("450–600 元/晚", 450) is True
+    assert contains_cny_price("450–600 元/晚", 600) is True
+    assert contains_cny_price("¥450–600/晚", 450) is True
+
+
+class RecordingClient:
+    def __init__(self):
+        self.kwargs = None
+
+    def search(self, query, **kwargs):
+        self.kwargs = kwargs
+        return {"results": []}
+
+
+@pytest.mark.asyncio
+async def test_search_passes_extra_kwargs():
+    client = RecordingClient()
+
+    await search_with_retry(
+        client, "北京 酒店", 3, country="china", language="zh"
+    )
+
+    assert client.kwargs["country"] == "china"
+    assert client.kwargs["language"] == "zh"

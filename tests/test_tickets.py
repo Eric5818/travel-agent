@@ -99,6 +99,33 @@ async def test_fabricated_price_is_rejected():
 
 
 @pytest.mark.asyncio
+async def test_price_in_foreign_currency_is_rejected_even_with_cny_elsewhere():
+    llm = FakeLLM(
+        [
+            json.dumps(
+                [{"index": 0, "status": "known", "min": 60, "max": 60, "note": "", "source_url": "https://a"}],
+                ensure_ascii=False,
+            )
+        ]
+    )
+    client = FakeTavily(
+        {
+            "故宫": payload(
+                "门票 US$60，附近餐厅人均 100 元",
+                "https://a",
+                "门票 US$60，附近餐厅人均 100 元",
+            )
+        }
+    )
+
+    result = await get_ticket_prices(
+        "北京", [attraction("故宫")], llm, client=client
+    )
+
+    assert result[0].status == "unknown"
+
+
+@pytest.mark.asyncio
 async def test_source_url_must_belong_to_results():
     llm = FakeLLM(
         [

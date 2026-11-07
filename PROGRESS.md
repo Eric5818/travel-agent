@@ -58,21 +58,25 @@
 | 10 | 前端页面 | ✅ | 聊天、chips、行程卡片、预算表、375px 适配 |
 | 11 | 端到端 + README | ✅ | 集成测试、真实冒烟、文档 |
 
-### 4. 测试状态（49 passed，0 warning）
+### 4. 测试状态（89 passed，0 warning）
 
 ```text
 tests/test_config.py        5 passed
-tests/test_schemas.py       3 passed
-tests/test_budget.py        8 passed
+tests/test_json_utils.py    6 passed
+tests/test_schemas.py       6 passed
+tests/test_budget.py        11 passed
+tests/test_tavily_utils.py  7 passed
 tests/test_weather.py       3 passed
 tests/test_attractions.py   4 passed
+tests/test_tickets.py       9 passed
+tests/test_lodging.py       8 passed
 tests/test_profile.py       6 passed
-tests/test_chat_agent.py    7 passed
+tests/test_chat_agent.py    11 passed
 tests/test_session.py       5 passed
 tests/test_api.py           7 passed
 tests/test_e2e.py           1 passed
 -----------------------------------
-合计                        49 passed
+合计                        89 passed
 ```
 
 运行命令：
@@ -85,7 +89,11 @@ tests/test_e2e.py           1 passed
 
 - DeepSeek `deepseek-chat` + Tavily + wttr.in
 - 输入：`我想去北京玩三天，喜欢历史` → `好的，开始规划`
-- 结果：3 天行程卡片正常渲染；槽位 chips 为「北京 / 3 天 / 历史人文 / 舒适 / 1 人 / 酒店」；预算约 **¥1,340 – ¥2,480**；数据来源 Tavily / wttr.in / 本地估算；无错误事件
+- 结果：3 天行程卡片正常渲染；槽位 chips 为「北京 / 3 天 / 历史人文 / 舒适 / 1 人 / 酒店」
+- **真实票价**：9 个景点全部 known/free —— 故宫 40–60、景山 2–10、天坛 10–15、颐和园 20–30、圆明园 10、雍和宫 25、八达岭长城 35–40、恭王府 40、什刹海免费
+- **真实住宿**：3 家参考酒店 —— 和颐中关村 493–532、和颐颐和园 526–563、首都宾馆 706–728 元/晚
+- **预算**：住宿 ¥986–¥1,456、门票 ¥182–¥230、总计 ¥1,708–¥2,766
+- 无未知项、无错误事件、无 JS 错误
 - 前端另用真实浏览器验证了 375px 视口（`innerWidth=375`、`body.scrollWidth=375`，无横向溢出）
 
 ### 6. 环境与发布链路（100%）
@@ -111,12 +119,16 @@ travel-agent/
 │   ├── agent/
 │   │   ├── __init__.py
 │   │   ├── chat_agent.py
+│   │   ├── json_utils.py
 │   │   ├── profile.py
 │   │   ├── prompts.py
 │   │   └── tools/
 │   │       ├── __init__.py
 │   │       ├── attractions.py
 │   │       ├── budget.py
+│   │       ├── lodging.py
+│   │       ├── tavily_utils.py
+│   │       ├── tickets.py
 │   │       └── weather.py
 │   └── static/
 │       ├── index.html
@@ -125,17 +137,24 @@ travel-agent/
 ├── tests/
 │   ├── fixtures/weather_j1.json
 │   ├── test_config.py
+│   ├── test_json_utils.py
 │   ├── test_schemas.py
 │   ├── test_budget.py
+│   ├── test_tavily_utils.py
 │   ├── test_weather.py
 │   ├── test_attractions.py
+│   ├── test_tickets.py
+│   ├── test_lodging.py
 │   ├── test_profile.py
 │   ├── test_chat_agent.py
 │   ├── test_session.py
 │   ├── test_api.py
 │   └── test_e2e.py
 ├── docs/superpowers/specs/2026-11-07-travel-agent-design.md
+├── docs/superpowers/specs/2026-11-07-ticket-prices-design.md
+├── docs/superpowers/specs/2026-11-07-accommodation-prices-design.md
 ├── docs/superpowers/plans/2026-11-07-travel-agent.md
+├── docs/superpowers/plans/2026-11-07-real-pricing.md
 ├── .env                  # 真实密钥，已忽略，绝不提交
 ├── .env.example
 ├── .gitignore
@@ -144,6 +163,21 @@ travel-agent/
 ├── README.md
 └── PROGRESS.md
 ```
+
+### 8. 真实票价与住宿参考价（2026-11-07）
+
+- [x] 票价工具：逐景点并行 Tavily 查询 + DeepSeek 批量抽取 + 证据校验
+- [x] 票价状态：known / free / unknown；未知不显示 0
+- [x] 住宿工具：中国/中文来源 + 每晚人民币价格，抽取 2–3 家酒店
+- [x] 住宿参考：名称、每晚区间、来源链接、查询日期
+- [x] 预算：门票 = 已用景点单价 × 人数；住宿 = 真实区间 × 晚数 × `ceil(人数/2)`
+- [x] 未知住宿不退回固定单价表
+- [x] 前端：活动票价、票价来源、住宿卡片、未知名额提示
+- [x] 真实冒烟通过（见第 5 节）
+
+> **执行中修正的两个根因**：
+> 1. `search_attractions` 返回的是 Tavily 文章标题，不是单个景点。票价查询改为在行程生成后，用活动中的真实景点名（如「故宫博物院」）逐项查询，名称与回填完全对齐。
+> 2. 住宿原查询返回大量外币/动态订房页。改为 `country="china"` + `language="zh"` 的价格导向查询，价格证据必须紧邻「元/¥/RMB/CNY」，并支持 `450–600 元` 区间写法。
 
 ---
 
@@ -155,6 +189,9 @@ travel-agent/
 4. **工具调用上限**：`ChatAgent.max_tool_calls` 默认 6，可注入更小值测试。
 5. **住宿晚数**：预算中住宿按 `days - 1` 晚计（单日行程按 1 晚），符合常见出行习惯。
 6. **天气描述语言**：wttr.in 原样返回英文描述，未做翻译。
+7. **票价查询时机**：真实冒烟后从「生成前按候选查」改为「生成后按行程真实景点名查」，解决文章标题与景点名错配。
+8. **住宿查询来源**：增加 `country="china"`、`language="zh"` 与「每晚价格 元 携程 美团」查询词；住宿抽取输入包含预算档次与日期上下文。
+9. **人民币证据**：价格数字必须紧邻「元/¥/RMB/CNY」，支持区间写法；不再接受「文本任意位置出现元」的弱校验。
 
 ---
 
@@ -166,7 +203,9 @@ travel-agent/
 | 会话存内存 | 重启丢失 | 第一期接受；后续可换 SQLite |
 | Tavily 免费额度 | 高频使用可能耗尽 | 控制搜索次数，后续加缓存 |
 | LLM 生成 JSON 不稳定 | 行程解析失败 | 校验 + 只修复一次；失败明确报错，不伪造兜底 |
-| 门票价格缺失 | 预算门票可能为 0 | 景点数据未返回票价时不估算，保持真实 |
+| 票价/酒店价格非实时 | 与当日实际价格有差异 | 显示查询日期与来源，注明以官方/实际预订为准 |
+| 住宿来源可能为历史文章 | 房价可能过期 | 展示来源链接；后续可加发布时间过滤 |
+| 非人民币价格 | 外币来源无法直接使用 | 严格要求人民币证据，外币一律标未知 |
 | 天气描述为英文 | 中文界面中出现英文 | 后续可加描述映射或本地化 |
 | 代理客户端关闭 | git 无法访问 GitHub | 保持 `127.0.0.1:12450` 运行 |
 | `.env` 含真实密钥 | 误提交会泄露 | 已 gitignore；每次提交前检查 |
@@ -176,11 +215,11 @@ travel-agent/
 ## 五、下一步（可选增强）
 
 1. 会话持久化（SQLite）与历史行程
-2. 天气描述中文化、门票价格补全
-3. Tavily 结果缓存与额度保护
-4. 餐饮推荐、真实 POI / 地图
-5. 导出 PDF / 分享链接
-6. 多城市联程与交通衔接
+2. 票价/住宿结果缓存（24h）与 Tavily 额度保护
+3. 住宿来源发布时间过滤、房型选择与实时库存 API
+4. 天气描述中文化、门票优惠票种（学生/老人）
+5. 餐饮推荐、真实 POI / 地图
+6. 导出 PDF / 分享链接、多城市联程
 
 ---
 

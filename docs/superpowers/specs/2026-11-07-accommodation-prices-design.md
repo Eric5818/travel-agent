@@ -58,14 +58,15 @@ async def get_accommodation_options(
 
 1. 若 `accommodation == "不需要"`：直接返回 `status="not_needed"`，不发起查询
 2. **一次 Tavily 查询**
-   - 查询词：`"{city} {accommodation} {budget_level} 住宿 价格 {月份} {nights}晚"`
-   - 月份：`start_date` 的 `YYYY-MM`；未指定时用当前月份
-   - 参数：`search_depth="advanced"`、`include_answer=True`、`max_results=5`
+   - 查询词：`"{city} {accommodation} 每晚价格 元 携程 美团"`
+   - 参数：`search_depth="advanced"`、`include_answer=True`、`max_results=5`、`country="china"`、`language="zh"`
    - 15 秒超时，失败重试 1 次
-3. **一次 LLM 抽取**：输出 JSON 数组，最多保留 3 家证据完整的酒店
-4. **证据校验**：酒店名、价格数字、来源 URL 三项都必须能在本次结果中找到
+3. **一次 LLM 抽取**：输入除 Tavily `answer/results` 外，还包含 `city / accommodation / budget_level / month / nights / travelers`，让抽取器按档次筛选；最多保留 3 家证据完整的酒店
+4. **证据校验**：酒店名、价格数字（必须紧邻人民币标记）、来源 URL 三项都必须能在本次结果中找到
 5. 计算 `nightly_range`：有效酒店最低价的最小值 – 最高价的最大值
 6. 有效酒店为 0 → `status="unknown"`
+
+> **实现修订（2026-11-07）**：真实冒烟发现原始查询返回大量 USD/HKD/TWD/SGD/UZS 价格或动态订房页，无法满足人民币每晚价校验。改为 `country="china"` + `language="zh"` 的价格导向查询，并把用户档次与日期上下文传入抽取器后，成功返回 3 家可追溯的人民币参考酒店。
 
 ## 5. 抽取提示词规则
 
@@ -83,9 +84,9 @@ async def get_accommodation_options(
 
 1. 酒店名出现在该次查询的任一结果标题或摘要中
 2. `min <= max` 且均 >= 0
-3. 价格数字（如 `450`、`450.0`、`450元`）出现在该次查询的 answer 或任一 result content 中
+3. 价格数字必须紧邻人民币标记：`450 元`、`¥450`、`450 yuan`、`450–600 元` 等；仅在文本其他位置出现「元」不算
 4. `source_url` 属于本次结果 URL 集合
-5. 币种必须为人民币；无法判断币种 → 丢弃
+5. 非人民币价格（US$ / HKD / TWD / SGD / UZS 等）→ 丢弃
 
 任一条件不满足 → 丢弃该酒店。最终有效酒店为 0 → `unknown`。
 
@@ -108,6 +109,7 @@ class Itinerary(BaseModel):
     # 现有字段不变
     accommodation_options: list[HotelOption] = Field(default_factory=list)
     accommodation_status: Literal["known", "unknown", "not_needed"] = "unknown"
+    accommodation_note: str | None = None
 ```
 
 - `known`：至少 1 家有效酒店，`nightly_range` 非空
@@ -207,6 +209,7 @@ def estimate_budget(
 | 风险 | 影响 | 应对 |
 |---|---|---|
 | Tavily 价格非实时 | 与当日实际房价有差异 | 标注查询日期、非实时库存、以实际预订为准 |
+| 中文价格来源可能为历史文章 | 房价可能过期 | 展示来源链接与查询日期；后续可加发布时间过滤 |
 | 总价/套餐价被误读为每晚价 | 预算偏差 | 只接受明确每晚价；否则丢弃 |
 | 酒店名证据匹配失败 | 有效酒店减少 | 保留 2–3 家目标，不足则全部标注 |
 | 多人房型假设 | 房间数不准确 | 明确双人房假设；后续可让用户选房型 |
