@@ -100,6 +100,25 @@ function money(value) {
   return `¥${Number(value).toLocaleString('zh-CN')}`;
 }
 
+function ticketText(activity) {
+  if (activity.type !== 'attraction') {
+    return '';
+  }
+  if (activity.ticket_status === 'free') {
+    return '免费';
+  }
+  if (activity.ticket_status === 'known' && activity.cost_estimate) {
+    return `门票 ${money(activity.cost_estimate.min)}–${money(activity.cost_estimate.max)}`;
+  }
+  if (activity.ticket_status === 'unknown') {
+    return '票价未知，需官网确认';
+  }
+  if (activity.cost_estimate && Number(activity.cost_estimate.max) > 0) {
+    return `门票 ${money(activity.cost_estimate.min)}–${money(activity.cost_estimate.max)}`;
+  }
+  return '';
+}
+
 function renderDay(day) {
   const section = document.createElement('article');
   section.className = 'day-card';
@@ -158,10 +177,9 @@ function renderDay(day) {
     if (activity.duration_min) {
       metaParts.push(`${activity.duration_min} 分钟`);
     }
-    if (activity.cost_estimate) {
-      metaParts.push(
-        `${money(activity.cost_estimate.min)}–${money(activity.cost_estimate.max)}`
-      );
+    const ticketLabel = ticketText(activity);
+    if (ticketLabel) {
+      metaParts.push(ticketLabel);
     }
     meta.textContent = metaParts.join(' · ');
 
@@ -169,6 +187,12 @@ function renderDay(day) {
     description.textContent = activity.description || '';
 
     body.append(name, meta, description);
+    if (activity.ticket_note) {
+      const ticketNote = document.createElement('p');
+      ticketNote.className = 'ticket-note';
+      ticketNote.textContent = activity.ticket_note;
+      body.appendChild(ticketNote);
+    }
     if (activity.source_url) {
       const link = document.createElement('a');
       link.href = activity.source_url;
@@ -176,6 +200,14 @@ function renderDay(day) {
       link.rel = 'noopener noreferrer';
       link.textContent = '查看来源';
       body.appendChild(link);
+    }
+    if (activity.ticket_source_url) {
+      const ticketLink = document.createElement('a');
+      ticketLink.href = activity.ticket_source_url;
+      ticketLink.target = '_blank';
+      ticketLink.rel = 'noopener noreferrer';
+      ticketLink.textContent = '票价来源';
+      body.appendChild(ticketLink);
     }
 
     item.append(time, body);
@@ -193,7 +225,82 @@ function renderDay(day) {
   return section;
 }
 
-function renderBudget(budget) {
+function renderAccommodation(itinerary) {
+  const status = itinerary.accommodation_status;
+  if (!status) {
+    return null;
+  }
+
+  const section = document.createElement('section');
+  section.className = 'accommodation-section';
+
+  const heading = document.createElement('h2');
+  heading.textContent = '住宿参考';
+  section.appendChild(heading);
+
+  if (status === 'not_needed') {
+    const note = document.createElement('p');
+    note.className = 'accommodation-note';
+    note.textContent = '本次行程不需要住宿。';
+    section.appendChild(note);
+    return section;
+  }
+
+  const hotels = itinerary.accommodation_options || [];
+  if (status !== 'known' || hotels.length === 0) {
+    const note = document.createElement('p');
+    note.className = 'accommodation-note';
+    note.textContent = '未查到真实住宿参考价，预算未计入住宿费用。';
+    section.appendChild(note);
+    return section;
+  }
+
+  const list = document.createElement('div');
+  list.className = 'hotel-list';
+  for (const hotel of hotels) {
+    const card = document.createElement('article');
+    card.className = 'hotel-card';
+
+    const name = document.createElement('h4');
+    name.textContent = hotel.name;
+
+    const price = document.createElement('p');
+    price.className = 'hotel-price';
+    price.textContent = hotel.price_per_night
+      ? `${money(hotel.price_per_night.min)} – ${money(hotel.price_per_night.max)} / 晚`
+      : '价格未知';
+
+    card.append(name, price);
+
+    if (hotel.note) {
+      const note = document.createElement('p');
+      note.className = 'muted';
+      note.textContent = hotel.note;
+      card.appendChild(note);
+    }
+    if (hotel.source_url) {
+      const link = document.createElement('a');
+      link.href = hotel.source_url;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = '查看来源';
+      card.appendChild(link);
+    }
+    list.appendChild(card);
+  }
+  section.appendChild(list);
+
+  if (itinerary.accommodation_note) {
+    const note = document.createElement('p');
+    note.className = 'accommodation-note';
+    note.textContent = itinerary.accommodation_note;
+    section.appendChild(note);
+  }
+  return section;
+}
+
+function renderBudget(itinerary) {
+  const budget = itinerary.budget;
   const table = document.createElement('table');
   table.className = 'budget-table';
 
@@ -224,11 +331,29 @@ function renderBudget(budget) {
     const nameCell = document.createElement('td');
     nameCell.textContent = label;
     const valueCell = document.createElement('td');
-    valueCell.textContent = `${money(range.min)} – ${money(range.max)}`;
+
+    if (key === 'lodging' && itinerary.accommodation_status === 'unknown') {
+      valueCell.textContent = '未查到参考价，未计入';
+    } else if (
+      key === 'lodging' &&
+      itinerary.accommodation_status === 'not_needed'
+    ) {
+      valueCell.textContent = '不需要住宿';
+    } else {
+      valueCell.textContent = `${money(range.min)} – ${money(range.max)}`;
+    }
+
     row.append(nameCell, valueCell);
     body.appendChild(row);
   }
   table.appendChild(body);
+
+  if ((itinerary.ticket_unknown_count || 0) > 0) {
+    const note = document.createElement('p');
+    note.className = 'budget-note';
+    note.textContent = `另有 ${itinerary.ticket_unknown_count} 个景点未查到票价，未计入门票预算。`;
+    table.appendChild(note);
+  }
 
   return table;
 }
@@ -261,8 +386,13 @@ function renderItinerary(itinerary) {
     els.itinerary.appendChild(renderDay(day));
   }
 
+  const accommodation = renderAccommodation(itinerary);
+  if (accommodation) {
+    els.itinerary.appendChild(accommodation);
+  }
+
   if (itinerary.budget) {
-    els.itinerary.appendChild(renderBudget(itinerary.budget));
+    els.itinerary.appendChild(renderBudget(itinerary));
   }
   els.itinerary.appendChild(renderSources(itinerary.data_sources));
 
