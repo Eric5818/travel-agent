@@ -8,3 +8,7 @@ class ToolError(RuntimeError):
         super().__init__(message)
         self.kind = kind
         self.message = message
+
+
+class ItineraryGenerationError(RuntimeError):
+    """Raised when the LLM cannot produce a valid itinerary after one repair."""
